@@ -1,10 +1,161 @@
 ---
-title: "JSC370 Final Project"
-author: "Your Name"
+title: "Lab 12"
+author: "Zhenyu Wang"
+date: '2022-03-29'
 output: 
     html_document:
         toc: TRUE
         toc_float: TRUE
 ---
-祝贺赵炜最新论文被收入。
-This is my JSC370 Final Project website.
+
+```{r setup, message=FALSE, echo=FALSE, warning=FALSE}
+
+library(data.table)
+library(tidyverse)
+library(dplyr)
+library(plotly)
+library(DT)
+library(knitr)
+
+# INITALIZE CODE CHUNK OPTIONS
+opts_chunk$set(
+  warning = FALSE,
+  message = FALSE,
+  eval=TRUE,
+  echo = TRUE,
+  cache = FALSE,
+  fig.width = 7, 
+  fig.align = 'center',
+  fig.asp = 0.618,
+  out.width = "700px",
+  class.source = "code-r")
+```
+
+
+```{css, echo = FALSE}
+.code-r { /* Code block */
+  font-size: 15px;
+}
+
+.code-r-small { /* Code block */
+  font-size: 10px;
+}
+```
+
+```{r load-data, echo=FALSE}
+fn <- "https://raw.githubusercontent.com/JSC370/jsc370-2023/main/labs/lab12/process_COVID_data.R"
+if (!file.exists("process_COVID_data.R"))
+  download.file(fn, destfile = "process_COVID_data.R")
+source("process_COVID_data.R")
+```
+
+```{r plot1, class.source="code-r-small", echo = FALSE}
+
+p1_scatter <- cv_states_today %>% 
+  plot_ly(x = ~pop_density, y = ~deathsper100k,
+          type = 'scatter', mode = 'markers', color = ~state,
+          size = ~population, sizes = c(5, 70), marker = list(sizemode='diameter', opacity=0.5),
+          hoverinfo = 'text',
+          text = ~paste( paste(state, ":", sep=""), paste(" Cases per 100k: ", per100k, sep="") , paste(" Deaths per 100k: ",
+                        deathsper100k, sep=""), sep = "<br>")) %>%
+  layout(title = "Population-normalized COVID-19 deaths vs. population density",
+                  yaxis = list(title = "Deaths per 100k"), xaxis = list(title = "Population Density"),
+         hovermode = "compare")
+
+# filter out "District of Columbia"
+cv_states_today_scatter <- cv_states_today %>% filter(state!="District of Columbia")
+
+p2_scatter <- cv_states_today_scatter %>% 
+  plot_ly(x = ~pop_density, y = ~deathsper100k,
+          type = 'scatter', mode = 'markers', color = ~state,
+          size = ~population, sizes = c(5, 70), marker = list(sizemode='diameter', opacity=0.5),
+          hoverinfo = 'text',
+          text = ~paste( paste(state, ":", sep=""), paste(" Cases per 100k: ", per100k, sep="") , paste(" Deaths per 100k: ",
+                        deathsper100k, sep=""), sep = "<br>")) %>%
+  layout(title = "Population-normalized COVID-19 deaths vs. population density",
+                  yaxis = list(title = "Deaths per 100k"), xaxis = list(title = "Population Density"),
+         hovermode = "compare")
+```
+
+```{r, echo = FALSE}
+# instead of filtering, we can try averaging every 2 weeks to avoid losing information
+# state names are moved to hover instead of showing on the y axis
+cv_states_2_week_avg <- cv_states |>
+  mutate(week2 = year(date) + round(week(date) / 2, 0)) |>
+  group_by(state, week2) |>
+  summarise(
+    date = min(date), 
+    new_cases = mean(new_cases),
+    .groups = "drop"
+  ) |>
+  arrange(state, date, new_cases)
+cv_states_mat_3 <- cv_states_2_week_avg |>
+  select(state, date, new_cases) |>
+  pivot_wider(names_from = date, values_from = new_cases) |>
+  column_to_rownames("state") |>
+  as.matrix()
+hovertext <- cv_states_2_week_avg |>
+  mutate(
+    hovertext = paste0(state, ", ", 
+                       strftime(date, format = "%b %d, %Y"), "\n",
+                       "2-week average new cases: ", round(new_cases, 1))) |>
+  select(state, date, hovertext) |>
+  pivot_wider(names_from = date, values_from = hovertext) |>
+  column_to_rownames("state") |>
+  as.matrix()
+
+p3<-plot_ly(
+  x = colnames(cv_states_mat_3),
+  z = cv_states_mat_3,
+  colors = "Greys",
+  type = "heatmap",
+  hoverinfo = "text",
+  text = hovertext
+) |>
+  colorbar(title = "New cases") |>
+  layout(
+    yaxis = list(showticklabels = FALSE, ticklen = 0, title = "States")
+  )
+```
+
+```{r, echo = FALSE}
+# using add_lines() for both new cases and new deaths displayed both traces.
+p4 <- cv_states |>
+  filter(state == "Florida") |>
+  plot_ly() |>
+  add_lines(
+    x = ~ date,
+    y = ~ new_cases,
+    color = "New Cases"
+  ) |>
+  add_lines(
+    x = ~ date,
+    y = ~ new_deaths,
+    color = "New Deaths"
+  )
+```
+
+# a set of plots {.tabset}
+
+## First Plot
+
+```{r echo=FALSE}
+p1_scatter
+```
+
+## Second Plot
+
+```{r echo=FALSE}
+p2_scatter
+```
+
+## My plot
+```{r echo=FALSE}
+p3
+```
+
+```{r echo=FALSE}
+p4
+```
+
+Congratulations, Wei!
